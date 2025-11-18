@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Report MustUnderstand="df" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:cl="http://schemas.microsoft.com/sqlserver/reporting/2010/01/componentdefinition" xmlns:df="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily" xmlns:am="http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata">
   <rd:ReportUnitType>Inch</rd:ReportUnitType>
   <rd:ReportID>d177bcf1-9f5d-4b5c-be50-8e204f9c7e68</rd:ReportID>
@@ -11,7 +11,7 @@
       <am:Name>PBIRB</am:Name>
       <am:Version>15.7.1813.16</am:Version>
     </am:UpdatedBy>
-    <am:LastModifiedTimestamp>2025-02-27T18:32:19.7968698Z</am:LastModifiedTimestamp>
+    <am:LastModifiedTimestamp>2025-11-18T15:13:46.9928932Z</am:LastModifiedTimestamp>
   </am:AuthoringMetadata>
   <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
   <AutoRefresh>0</AutoRefresh>
@@ -243,343 +243,400 @@ END) AS VALID</CommandText>
             <Value>=Parameters!EndDateJuly.Value</Value>
           </QueryParameter>
         </QueryParameters>
-        <CommandText>SELECT FY, PER, APD_END_DT
+        <CommandText>--==============================================
+-- NAME: ?
+-- DATE: ?
+-- DESC: RPT-156 - GA_CashRevExpTransByFundName (EndingBalance)
+-- Mod By:   Matthew Fuiten
+-- Mod Date: 11/17/2025
+-- Mod Desc: Rewrote this query to use CTE's and a few pieces on how the data is called to be more efficient.
+-- Mod By:  
+-- Mod Date:
+-- Mod Desc:
+--==============================================
+
+--DECLARE @FiscalYear int = '2026';
+--DECLARE @FiscalPeriod INT = 3;
+--DECLARE @FiscalPeriodEndD date = '2025-09-30'
+--DECLARE @Fund varchar(4) = '0957';
+--DECLARE @EndDateJuly DATETIME = '2025-07-31 00:00:00.000'; 
+
+/************* Periods *************/
+WITH Period_GA_CashRevExpTransByFundName_CTE
+AS 
+(
+SELECT FY, PER, APD_END_DT
 ,CONCAT(FY,'-',PER) AS ACC_PER
-INTO #P
 FROM R_APD
-WHERE
-(FY=@FiscalYear AND PER&gt;0 AND PER&lt;=@FiscalPeriod) OR 
-(FY = @FiscalYear -1  AND PER&gt;12  AND 
-(PER &lt;= (CASE WHEN @FiscalPeriod='1' THEN '13' END) OR PER&lt;= (CASE WHEN @FiscalPeriod='2' then '14' END) OR PER &lt;=(CASE WHEN @FiscalPeriod&gt; '2' THEN '15' end)))
+WHERE(FY=@FiscalYear AND PER&gt;0 AND PER&lt;=@FiscalPeriod) 
+OR (FY = @FiscalYear -1  AND PER&gt;12  AND  
+   (PER &lt;= (CASE WHEN @FiscalPeriod='1' THEN '13' END) OR PER&lt;= (CASE WHEN @FiscalPeriod='2' then '14' END) OR PER &lt;=(CASE WHEN @FiscalPeriod&gt; '2' THEN '15' end)))
+),
 
-SELECT distinct BAL.FUND_CD,BAL.FCAT_CD 
-,BAL.FUND_NM, BAL.FCAT_NM
-,ISNULL(ENDBALANCEMTD,0) AS ENDBALANCEMTD
-,ISNULL(BEGBALANCEMTD,0) AS BEGBALANCEMTD
-,ISNULL(BEGBALANCEYTD,0) AS BEGBALANCEYTD
-,ISNULL(ENDBALANCEYTD,0) AS ENDBALANCEYTD
-,ISNULL(BEGBALANCEMTDJuly,0) AS BEGBALANCEMTDJuly
-,ISNULL(SumAllFundsYTD,0) as SumAllFundsYTD
-,ISNULL(SumAllFundsMTD,0) as SumAllFundsMTD
-, ISNULL(CashReceiptsYTD,0) AS CashReceiptsYTD
-, ISNULL(TransfersInYTD,0) AS TransfersInYTD
-, ISNULL(TransfersOutYTD,0) AS TransfersOutYTD
-, ISNULL(GrossWarrantYTD,0) AS GrossWarrantYTD
-, ISNULL(CancelVouchersPayableYTD,0) AS CancelVouchersPayableYTD
-, ISNULL(IWPayableYTD,0) AS IWPayableYTD
-, ISNULL(LiabYTD,0) AS LiabYTD
-, ISNULL(ReceiptsYTD,0) AS ReceiptsYTD
-, ISNULL(ExpendituresYTD,0) AS ExpendituresYTD
-, ISNULL(VouchersPayable,0) AS VouchersPayableYTD
-, ISNULL(DueFrom,0) AS DueFromYTD
-, ISNULL(DueTo,0) AS DueToYTD
 
-, ISNULL(CashReceiptsMTD,0) AS CashReceiptsMTD
-, ISNULL(TransfersInMTD,0) AS TransfersInMTD
-, ISNULL(TransfersOutMTD,0) AS TransfersOutMTD
-, ISNULL(GrossWarrantMTD,0) AS GrossWarrantMTD
-, ISNULL(CancelVouchersPayableMTD,0) AS CancelVouchersPayableMTD
-, ISNULL(IWPayableMTD,0) AS IWPayableMTD
-, ISNULL(LiabMTD,0) AS LiabMTD
-, ISNULL(ReceiptsMTD,0) AS ReceiptsMTD
-, ISNULL(ExpendituresMTD,0) AS ExpendituresMTD
-, ISNULL(VouchersPayable,0) AS VouchersPayableMTD
-, ISNULL(DueFrom,0) AS DueFromMTD
-, ISNULL(DueTo,0) AS DueToMTD
+/************* ALL Funds *************/
+	AllFunds_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT 
+       A.FY AS FY_DC
+      ,A.FUND_CD
+	  ,A.FCAT_CD
+	  ,A.FUND_NM
+	  ,B.FCAT_NM 
+FROM R_FUND AS A 
+LEFT JOIN r_Fcat AS B ON a.FCAT_CD = b.fcat_cd 
+WHERE A.FY = @FiscalYear 
+ AND (A.FUND_CD = @Fund OR 'ALL' = @Fund)
+),
 
-, ISNULL(BEGBALANCEMTD,0) +  ISNULL(CashReceiptsMTD,0) +  ISNULL(TransfersInMTD,0) - abs( ISNULL(TransfersOutMTD,0) )
-- abs(ISNULL(GrossWarrantMTD,0) +  ISNULL(CancelVouchersPayableMTD,0)   +  ISNULL(LiabMTD,0) +  ISNULL(ReceiptsMTD,0) 
-+  ISNULL(ExpendituresMTD,0)) as EndingBalanceMTD
-,  ISNULL(BEGBALANCEMTDJuly,0) +  ISNULL(CashReceiptsYTD,0) +  ISNULL(TransfersInYTD,0) - abs( ISNULL(TransfersOutYTD,0) )
-- abs( ISNULL(GrossWarrantYTD,0) +  ISNULL(CancelVouchersPayableYTD,0)  +  ISNULL(LiabYTD,0) +  ISNULL(ReceiptsYTD,0) 
-+  ISNULL(ExpendituresYTD,0)) as EndingBalanceYTD
 
-FROM 
+/************* END BALANCE MTD *************/
+	EndBalanceMTD_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT  
+       CBAL.FUND_CD 
+	  ,SUM(CBAL.CBAL_AM) AS ENDBALANCEMTD
+FROM IOC_RPT_SUMM_CBAL AS CBAL
+INNER JOIN AllFunds_GA_CashRevExpTransByFundName_CTE AS AF ON AF.FUND_CD = CBAL.FUND_CD COLLATE Latin1_General_CI_AS 
+WHERE (CBAL.FUND_CD = @Fund OR 'ALL' = @Fund)
+  AND CAST(CONCAT(CBAL.PSTNG_YEAR,'-',LEFT(CAST(CBAL.PSTNG_MONTH AS VARCHAR(2)) +'00',2),'-01') AS DATE) &lt;= DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
+GROUP BY CBAL.FUND_CD
+),
 
-/******************************* BEGINNING AND END BALANCES **********************************/
-( -- BAL
-SELECT distinct A1.FUND_CD, A1.FUND_NM, A1.FCAT_CD, A1.FCAT_NM   ,A1.FY_DC, a.ENDBALANCEMTD,  BEGBALANCEMTD, BEGBALANCEYTD ,ENDBALANCEYTD
-,BEGBALANCEMTDJuly
+/************* BEGINNING BALANCE MTD OTHER THAN JULY  *************/
+	BegBalanceMTD_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT  
+       CBAL.FUND_CD 
+	  ,SUM(CBAL.CBAL_AM) AS BEGBALANCEMTD
+FROM IOC_RPT_SUMM_CBAL AS CBAL 
+INNER JOIN AllFunds_GA_CashRevExpTransByFundName_CTE AS AF ON AF.FUND_CD = CBAL.FUND_CD COLLATE Latin1_General_CI_AS 
+WHERE (CBAL.FUND_CD = @Fund OR 'ALL' = @Fund)
+  AND CAST(CONCAT(CBAL.PSTNG_YEAR,'-',LEFT(CAST(CBAL.PSTNG_MONTH AS VARCHAR(2)) +'00',2),'-01') AS DATE) &lt; DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
+GROUP BY CBAL.FUND_CD
+),
+
+/************* BEGINNING BALANCE MTD FOR JULY  *************/
+	BegBalanceMTDJuly_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT  
+       CBAL.FUND_CD 
+	  ,SUM(CBAL.CBAL_AM) AS BEGBALANCEMTDJuly
+FROM IOC_RPT_SUMM_CBAL AS CBAL
+INNER JOIN AllFunds_GA_CashRevExpTransByFundName_CTE AS AF ON AF.FUND_CD = CBAL.FUND_CD COLLATE Latin1_General_CI_AS 
+WHERE (CBAL.FUND_CD = @Fund OR 'ALL' = @Fund)
+--AMOUNTS LESS THAN THE END DATE FOR PER_DCIOD 1 OF THE YEAR
+AND CAST(CONCAT(CBAL.PSTNG_YEAR,'-',LEFT(CAST(CBAL.PSTNG_MONTH AS VARCHAR(2)) +'00',2),'-01') AS DATE) &lt; DATEADD(m, DATEDIFF(m, 0,@EndDateJuly), 0) 
+GROUP BY CBAL.FUND_CD
+),
+
+/************* BEGINNING BALANCE YTD OTHER THAN JULY  *************/
+	BegBalanceYTD_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT  
+       CBAL.FUND_CD 
+	  ,SUM(CBAL.CBAL_AM) AS BEGBALANCEYTD
+FROM IOC_RPT_SUMM_CBAL AS CBAL 
+INNER JOIN AllFunds_GA_CashRevExpTransByFundName_CTE AS AF ON AF.FUND_CD = CBAL.FUND_CD COLLATE Latin1_General_CI_AS 
+WHERE (CBAL.FUND_CD = @Fund OR 'ALL' = @Fund)
+and CAST(CONCAT(CBAL.PSTNG_YEAR,'-',LEFT(CAST(CBAL.PSTNG_MONTH AS VARCHAR(2)) +'00',2),'-01') AS DATE) &lt; DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
+GROUP BY CBAL.FUND_CD
+),
+
+/************* END BALANCE YTD *************/
+	EndBalanceYTD_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT DISTINCT  
+       CBAL.FUND_CD 
+	  ,SUM(CBAL.CBAL_AM) AS ENDBALANCEYTD
+FROM IOC_RPT_SUMM_CBAL AS CBAL
+INNER JOIN AllFunds_GA_CashRevExpTransByFundName_CTE AS AF ON AF.FUND_CD = CBAL.FUND_CD COLLATE Latin1_General_CI_AS 
+WHERE (CBAL.FUND_CD =@Fund OR 'ALL' = @Fund)
+  AND CAST(CONCAT(CBAL.PSTNG_YEAR,'-',LEFT(CAST(CBAL.PSTNG_MONTH AS VARCHAR(2)) +'00',2),'-01') AS DATE) &lt;= DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
+GROUP BY CBAL.FUND_CD
+),
+
+/************* Journal Accounting Totals *************/
+	JA_Totals_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT JA.FUND_CD
+      ,JA.PER_DC
+	  ,JA.FY_DC 
+	  ,JA.PSTNG_AM 
+	  ,JA.DOC_ID
+	  ,JA.DOC_CD
+	  ,DOC_DEPT_CD
+	  ,JA.RSRC_CD
+	  ,JA.RSCAT_CD
+	  ,PD.PSCD_CLOS_CL_CD
+	  ,JA.DRCR_IND
+	  ,JA.BSA_CD
+	  ,JA.RFED_DOC_CD
+	  ,JA.PSTNG_CD_ID
+	  ,JA.PSTD_DT
+	  ,PD.PSCD_ID
+	  ,JA.DOC_TYP
+	  ,JA.DEPT_CD
+	  ,JA.OBJ_CD
+	  ,JA.FCAT_CD
+	  ,JA.SOBJ_CD
+FROM JRNL_ACTG AS JA
+INNER JOIN Period_GA_CashRevExpTransByFundName_CTE AS P ON CONCAT(JA.FY_DC,'-', JA.PER_DC) = P.ACC_PER
+LEFT JOIN R_PSCD PD ON JA.PSTNG_CD_ID = PD.PSCD_ID
+WHERE JA.FUND_CD NOT IN ('9999','0002','2222') 
+ AND (SELECT RBSA.CASH_ACCT_FL 
+        FROM R_BSA AS RBSA 
+	   WHERE JA.BSA_CD = RBSA.BSA_CD 
+	     AND RBSA.FY = JA.FY_DC 
+	  ) = 1 ---- 2025.10.23
+ AND (JA.FUND_CD = @Fund OR 'ALL' =@Fund)
+),
+
+/************* YTD Group Levels *************/
+    YTD_GLevels_GA_CashRevExpTransByFundName_CTE
+AS
+(
+SELECT YTD1.FUND_CD     
+,SUM(YTD1.CashReceiptsYTD)          AS CashReceiptsYTD
+,SUM(YTD1.TransfersInYTD)           AS TransfersInYTD
+,SUM(YTD1.TransfersOutYTD)          AS TransfersOutYTD
+,SUM(YTD1.GrossWarrantYTD)          AS GrossWarrantYTD
+,SUM(YTD1.CancelVouchersPayableYTD) AS CancelVouchersPayableYTD
+,SUM(YTD1.IWPayableYTD)             AS IWPayableYTD
+,SUM(YTD1.LiabYTD)                  AS LiabYTD
+,SUM(YTD1.ReceiptsYTD)              AS ReceiptsYTD
+,SUM(YTD1.ExpendituresYTD)          AS ExpendituresYTD
+
 FROM
-/*** ALL FUNDS ***/
+
 (
-SELECT distinct a.FY AS FY_DC,a.FUND_CD, a.FCAT_CD, a.FUND_NM, b.FCAT_NM 
-FROM R_FUND a left join r_Fcat b on a.FCAT_CD = b.fcat_cd 
-WHERE a.FY=@FiscalYear  and (a.FUND_CD =@Fund or 'ALL' =@Fund)
-) AS A1 LEFT JOIN
-
-/************************ ENDBALANCEMTD ***/
-(
-		SELECT DISTINCT  FUND_CD ,   SUM(CBAL_AM)  AS ENDBALANCEMTD
-		from IOC_RPT_SUMM_CBAL 
-		WHERE (FUND_CD =@Fund or 'ALL' = @Fund)
-		and cast(concat(PSTNG_YEAR,'-',left(cast(PSTNG_MONTH as varchar(2)) +'00',2),'-01') as date) &lt;= DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
-		GROUP BY FUND_CD
-) AS A ON A1.FUND_CD = A.FUND_CD COLLATE Latin1_General_CI_AS 
-
-LEFT JOIN 
--- BEGINNING BALANCE MTD OTHER THAN JULY 
-(
-SELECT DISTINCT  FUND_CD ,   SUM(CBAL_AM)  AS BEGBALANCEMTD
-		from IOC_RPT_SUMM_CBAL 
-		WHERE (FUND_CD =@Fund or 'ALL' = @Fund)
-		and cast(concat(PSTNG_YEAR,'-',left(cast(PSTNG_MONTH as varchar(2)) +'00',2),'-01') as date) &lt; DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
-		GROUP BY FUND_CD
-) AS B  ON A1.FUND_CD = B.FUND_CD COLLATE Latin1_General_CI_AS 
-
-LEFT JOIN  
---- BEGINNING BALANCE MTD FOR JULY
-(
-		SELECT DISTINCT  FUND_CD ,   SUM(CBAL_AM)  AS BEGBALANCEMTDJuly
-		from IOC_RPT_SUMM_CBAL 
-		WHERE (FUND_CD =@Fund or 'ALL' = @Fund)
-		--AMOUNTS LESS THAN THE END DATE FOR PER_DCIOD 1 OF THE YEAR
-		and cast(concat(PSTNG_YEAR,'-',left(cast(PSTNG_MONTH as varchar(2)) +'00',2),'-01') as date) &lt; DATEADD(m, DATEDIFF(m, 0,@EndDateJuly), 0) 
-		GROUP BY FUND_CD
-) AS H  ON A1.FUND_CD = H.FUND_CD COLLATE Latin1_General_CI_AS
-
-LEFT JOIN  
---- BEGINNING BALANCE YTD OTHER THAN JULY
-(
-		SELECT DISTINCT  FUND_CD ,   SUM(CBAL_AM)  AS BEGBALANCEYTD
-		from IOC_RPT_SUMM_CBAL 
-		WHERE (FUND_CD =@Fund or 'ALL' = @Fund)
-		and cast(concat(PSTNG_YEAR,'-',left(cast(PSTNG_MONTH as varchar(2)) +'00',2),'-01') as date) &lt; DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
-		GROUP BY FUND_CD
-) AS I  ON A1.FUND_CD = I.FUND_CD COLLATE Latin1_General_CI_AS 
-
-LEFT JOIN
--- END BALANCE YTD ---------------------
-(
-		SELECT DISTINCT  FUND_CD ,   SUM(CBAL_AM)  AS ENDBALANCEYTD
-		from IOC_RPT_SUMM_CBAL 
-		WHERE (FUND_CD =@Fund or 'ALL' = @Fund)
-		and cast(concat(PSTNG_YEAR,'-',left(cast(PSTNG_MONTH as varchar(2)) +'00',2),'-01') as date) &lt;= DATEADD(m, DATEDIFF(m, 0,@FiscalPeriodEndD), 0)
-		GROUP BY FUND_CD
-)AS J ON A1.FUND_CD = J.FUND_CD COLLATE Latin1_General_CI_AS
-)  AS BAL
--- END BAL 
+SELECT DISTINCT YTD.FUND_CD
+,CASE WHEN YTD.GROUP_LEVEL = 'CR_YTD'        THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS CashReceiptsYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'TRIN_YTD'       THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS TransfersInYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'TROUT_YTD'      THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS TransfersOutYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'GROSS_WI_YTD'   THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS GrossWarrantYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'CANCELLED_YTD'  THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS CancelVouchersPayableYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'IW_PAY_YTD'     THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS IWPayableYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'OTHER_LIAB_YTD' THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS LiabYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'PY_REC_YTD'     THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS ReceiptsYTD
+,CASE WHEN YTD.GROUP_LEVEL= 'PY_EXP_YTD'     THEN SUM(YTD.PSTNG_AM) ELSE 0 END AS ExpendituresYTD
 
 
--- END BAL 
-LEFT JOIN 
-
-----------------------------------YTD Calculations ------------------------------------------------------------------
----------------------------------------------------------------------------------------------------------------------
-(    --- SUM ALL FUNDS YTD
-	SELECT DISTINCT FUND_CD 
-	,sum(SumAllFundsYTD) as SumAllFundsYTD
-	from 
-	(
-		Select FUND_CD, PER_DC,  FY_DC,  sum(PSTNG_AM) as SumAllFundsYTD  from JRNL_ACTG  a
-		Left join R_PSCD b on a.PSTNG_CD_ID=b.PSCD_ID
-		WHERE  a.FUND_CD not in ('9999','0002','2222') 
-		and b.PSCD_CLOS_CL_CD ='5'  GROUP BY FUND_CD, FCAT_CD,PER_DC, FY_DC, PER_DC
-	)  AS X  
-    JOIN #P P ON CONCAT(X.FY_DC,'-', X.PER_DC) = P.ACC_PER
-	WHERE  
-  (FUND_CD =@Fund or 'ALL' =@Fund) 
-  GROUP BY FUND_CD
-) as AX 
-ON BAL.FUND_CD = AX.FUND_CD COLLATE Latin1_General_CI_AS --and BAL.FY_DC = AX.FY_DC
-
-LEFT JOIN 
-
-( -- SUM ALL FUNDS MTD
-SELECT DISTINCT FUND_CD  
-,sum(SumAllFundsYTD) as SumAllFundsMTD
-from 
+FROM
 ( 
-	Select FUND_CD, PER_DC, FY_DC,  sum(PSTNG_AM) as SumAllFundsYTD  
-	from JRNL_ACTG  Left join R_PSCD on JRNL_ACTG.PSTNG_CD_ID=R_PSCD.PSCD_ID
-	WHERE  jrnl_Actg.FUND_CD not in ('9999','0002','2222') 
-	and R_PSCD.PSCD_CLOS_CL_CD ='5'  GROUP BY FUND_CD, FCAT_CD,FY_DC,PER_DC
-)  AS X 
-    JOIN #P P ON CONCAT(X.FY_DC,'-', X.PER_DC) = P.ACC_PER
-WHERE  (FUND_CD =@Fund or 'ALL' =@Fund) GROUP BY FUND_CD 
-) as AC1 
-ON AX.FUND_CD = AC1.FUND_CD
+SELECT JA.FUND_CD
+      ,JA.FY_DC
+      ,JA.PSTNG_AM
+	  ,CASE WHEN ((JA.PSCD_ID = 'A001'
+              AND (JA.DOC_CD = 'C1' 
+               OR  (JA.DOC_TYP = 'JV' AND JA.RFED_DOC_CD = 'PRCI' AND JA.DRCR_IND = 'D') 
+               OR  (JA.DOC_TYP = 'ABS' AND JA.DOC_CD like ('EWX%') AND JA.DRCR_IND = 'D')  
+               OR (JA.DOC_CD = 'IT' AND JA.DRCR_IND = 'D') 
+               OR  (JA.DOC_CD = 'RTGPF' AND JA.DRCR_IND = 'D')
+               OR (JA.DOC_TYP = 'JV'AND JA.FUND_CD IN ('0658','0722') AND JA.DOC_DEPT_CD &lt;&gt;'799' AND JA.DRCR_IND = 'D') 
+               OR (JA.DOC_TYP = 'JV' AND JA.DOC_ID like 'E%'AND DRCR_IND = 'D'))) OR ( JA.PSCD_ID = 'D035' AND JA.DRCR_IND = 'D'))      THEN 'CR_YTD'
+            WHEN JA.PSCD_ID = 'A001' AND JA.DOC_TYP = 'JV' AND DEPT_CD ='799'  and JA.RSRC_CD IS NOT NULL                               THEN 'TRIN_YTD'
+	        WHEN JA.PSCD_ID = 'A001'  AND JA.DOC_TYP = 'JV' AND DEPT_CD ='799'    AND JA.OBJ_CD IS NOT NULL  AND JA.SOBJ_CD IS NOT NULL THEN 'TROUT_YTD'
+            WHEN JA.PSCD_CLOS_CL_CD ='5' AND (JA.DOC_CD IN ('AD','EFT','IT','MDCW','MD', 'RTGPF','JVA') ---- 2025.10.28 - Add ing JVA to GROSS_WI_MTD      
+										   OR (JA.DOC_CD= 'JVACM' AND JA.OBJ_CD IS NOT NULL AND isnull(JA.RFED_DOC_CD,'') = 'PRCI') 
+										   OR (JA.DOC_TYP='ABS'AND JA.OBJ_CD IS NOT NULL) 
+										   OR (JA.DOC_CD ='CR' AND JA.OBJ_CD IS NOT NULL) )                                             THEN 'GROSS_WI_YTD'
+            WHEN  JA.PSCD_CLOS_CL_CD ='5' AND  JA.DOC_CD IN ('DCAN','DC')                                                               THEN 'CANCELLED_YTD'
+            WHEN ISNULL( JA.BSA_CD,0) = ('2034')  AND JA.PSCD_CLOS_CL_CD ='2'                                                           THEN 'IW_PAY_YTD'
+            WHEN JA.PSCD_CLOS_CL_CD ='2' AND JA.BSA_CD IN('2031', '2035','2036','2040', '2045','2300')                                  THEN 'OTHER_LIAB_YTD'
+	        -- PRIOR YEAR RECEIPTS MTD 
+	        WHEN JA.PSCD_CLOS_CL_CD ='5' AND ISNULL(JA.RSCAT_CD,'') ='RE'                                                               THEN 'PY_REC_YTD'
+	        -- PRIOR YEAR EXPENDITURES MTD 
+	        WHEN JA.PSCD_CLOS_CL_CD ='5' AND ISNULL(JA.RSCAT_CD,'') = 'EX' AND JA.DOC_TYP ='CR'                                         THEN 'PY_EXP_YTD'
+		ELSE 'OTHER'
+	   END AS GROUP_LEVEL
+	  ,CONCAT(JA.FUND_CD,JA.FCAT_CD,JA.PER_DC,JA.FY_DC) AS KEY2  
+FROM JA_Totals_GA_CashRevExpTransByFundName_CTE AS JA
+) AS YTD 
+WHERE YTD.GROUP_LEVEL IS NOT NULL
+GROUP BY YTD.FUND_CD, YTD.FY_DC, YTD.GROUP_LEVEL
+) AS YTD1
+GROUP BY FUND_CD
+),
 
-LEFT JOIN
-
-/********* YTD *****************************************************************/
-( -- M2
-SELECT FUND_CD     
-, SUM(CashReceiptsYTD) as CashReceiptsYTD
-,SUM(TransfersInYTD) as TransfersInYTD
-,SUM(TransfersOutYTD) as TransfersOutYTD
-,SUM(GrossWarrantYTD) as GrossWarrantYTD
-,SUM(CancelVouchersPayableYTD) as CancelVouchersPayableYTD
-,SUM(IWPayableYTD) as IWPayableYTD
-,SUM(LiabYTD) as LiabYTD
-,SUM(ReceiptsYTD) as ReceiptsYTD
-,SUM(ExpendituresYTD) as ExpendituresYTD
-
-FROM
-
+/************* MTD Group Levels *************/
+    MTD_GLevels_GA_CashRevExpTransByFundName_CTE
+AS
 (
-SELECT DISTINCT FUND_CD--,  FY_DC 
-,CASE WHEN GROUP_LEVEL= 'CR_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS CashReceiptsYTD
-,CASE WHEN GROUP_LEVEL= 'TRIN_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS TransfersInYTD
-,CASE WHEN GROUP_LEVEL= 'TROUT_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS TransfersOutYTD
-,CASE WHEN GROUP_LEVEL= 'GROSS_WI_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS GrossWarrantYTD
-,CASE WHEN GROUP_LEVEL= 'CANCELLED_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS CancelVouchersPayableYTD
-,CASE WHEN GROUP_LEVEL= 'IW_PAY_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS IWPayableYTD
-,CASE WHEN GROUP_LEVEL= 'OTHER_LIAB_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS LiabYTD
-,CASE WHEN GROUP_LEVEL= 'PY_REC_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS ReceiptsYTD
-,CASE WHEN GROUP_LEVEL= 'PY_EXP_YTD' THEN SUM(PSTNG_AM) ELSE 0 END AS ExpendituresYTD
+SELECT MTD1.FUND_CD 
+,SUM(MTD1.CashReceiptsMTD)          AS CashReceiptsMTD
+,SUM(MTD1.TransfersInMTD)           AS TransfersInMTD
+,SUM(MTD1.TransfersOutMTD)          AS TransfersOutMTD
+,SUM(MTD1.GrossWarrantMTD)          AS GrossWarrantMTD
+,SUM(MTD1.CancelVouchersPayableMTD) AS CancelVouchersPayableMTD
+,SUM(MTD1.IWPayableMTD)             AS IWPayableMTD
+,SUM(MTD1.LiabMTD)                  AS LiabMTD
+,SUM(MTD1.ReceiptsMTD)              AS ReceiptsMTD
+,SUM(MTD1.ExpendituresMTD)          AS ExpendituresMTD
+
+FROM
+(SELECT DISTINCT MTD.FUND_CD
+,CASE WHEN MTD.GROUP_LEVEL= 'CR_MTD'         THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS CashReceiptsMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'TRIN_MTD'       THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS TransfersInMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'TROUT_MTD'      THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS TransfersOutMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'GROSS_WI_MTD'   THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS GrossWarrantMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'CANCELLED_MTD'  THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS CancelVouchersPayableMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'IW_PAY_MTD'     THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS IWPayableMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'OTHER_LIAB_MTD' THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS LiabMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'PY_REC_MTD'     THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS ReceiptsMTD
+,CASE WHEN MTD.GROUP_LEVEL= 'PY_EXP_MTD'     THEN SUM(MTD.PSTNG_AM) ELSE 0 END AS ExpendituresMTD
 
 
 FROM
 (
-SELECT JA.FUND_CD,PER_DC, FY_DC ,JA.PSTNG_AM , doc_id, doc_cd, DOC_DEPT_CD, RSRC_CD, RSCAT_CD, PD.PSCD_CLOS_CL_CD,drcr_ind, BSA_CD,
-RFED_DOC_CD, JA.PSTNG_CD_ID, PSTD_DT, 
-	CASE 
+SELECT 
+       JA.FUND_CD
+      ,JA.FY_DC
+      ,JA.PSTNG_AM
+	  ,CASE WHEN ((JA.PSCD_ID = 'A001'
+			  AND (JA.DOC_CD = 'C1' 
+			   OR  (JA.DOC_TYP = 'JV' AND JA.RFED_DOC_CD = 'PRCI' AND JA.DRCR_IND = 'D') 
+			   OR  (JA.DOC_TYP = 'ABS' AND JA.DOC_CD like ('EWX%') AND JA.DRCR_IND = 'D')  
+			   OR (JA.DOC_CD = 'IT' AND JA.DRCR_IND = 'D') 
+			   OR  (JA.DOC_CD = 'RTGPF' AND JA.DRCR_IND = 'D')
+			   OR (JA.DOC_TYP = 'JV'AND FUND_CD IN ('0658','0722') AND JA.DOC_DEPT_CD &lt;&gt;'799' AND JA.DRCR_IND = 'D') 
+			   OR (JA.DOC_TYP = 'JV' AND JA.DOC_ID like 'E%'AND DRCR_IND = 'D'))) OR ( JA.PSCD_ID = 'D035' AND DRCR_IND = 'D'))  THEN 'CR_MTD'
+            WHEN JA.PSCD_ID = 'A001' AND DOC_TYP = 'JV' AND DEPT_CD ='799' AND RSRC_CD IS NOT NULL                               THEN 'TRIN_MTD'
+	        WHEN JA.PSCD_ID = 'A001'  AND DOC_TYP = 'JV' AND DEPT_CD ='799'   AND OBJ_CD IS NOT NULL  AND SOBJ_CD IS NOT NULL    THEN 'TROUT_MTD'
+	        WHEN JA.PSCD_CLOS_CL_CD ='5' AND (DOC_CD IN ('AD','EFT','IT','MDCW','MD', 'RTGPF','JVA') ---- 2025.10.28 - Adding JVA to GROSS_WI_MTD  
+										  OR (DOC_CD= 'JVACM' AND OBJ_CD IS NOT NULL AND isnull(RFED_DOC_CD,'') = 'PRCI') 
+										  OR  (DOC_TYP='ABS' AND OBJ_CD IS NOT NULL) 
+										  OR (DOC_CD ='CR' AND OBJ_CD IS NOT NULL) )                                             THEN 'GROSS_WI_MTD'
+            WHEN  JA.PSCD_CLOS_CL_CD ='5' AND  DOC_CD IN ('DCAN','DC')                                                           THEN 'CANCELLED_MTD'
+	        WHEN ISNULL( JA.BSA_CD,0) IN ('2034') AND JA.PSCD_CLOS_CL_CD ='2'                                                    THEN 'IW_PAY_MTD'
+	        WHEN JA.PSCD_CLOS_CL_CD ='2' AND JA.BSA_CD IN('2031', '2035','2036','2040', '2045','2300')                           THEN 'OTHER_LIAB_MTD'
+			-- PRIOR YEAR RECEIPTS MTD 
+			WHEN JA.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') ='RE'                                                        THEN 'PY_REC_MTD'
+			-- PRIOR YEAR EXPENDITURES MTD 
+			WHEN JA.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') = 'EX' AND DOC_TYP ='CR'                                     THEN 'PY_EXP_MTD'
+	   ELSE 'OTHER'
+	   END AS GROUP_LEVEL
+	  ,CONCAT(JA.FUND_CD,FCAT_CD,PER_DC, FY_DC) AS KEY2  
+FROM JA_Totals_GA_CashRevExpTransByFundName_CTE AS JA
+WHERE (JA.FY_DC=@FiscalYear AND ja.PER_DC = @FiscalPeriod) 
+   OR (JA.FY_DC = @FiscalYear -1  AND (JA.PER_DC = (CASE WHEN @FiscalPeriod='1' THEN '13' WHEN @FiscalPeriod='2' then '14' WHEN @FiscalPeriod= '3' THEN '15' END)))
+) AS MTD 
+WHERE MTD.GROUP_LEVEL IS NOT NULL
+GROUP BY MTD.FUND_CD, MTD.FY_DC, MTD.GROUP_LEVEL
+) AS MTD1
+GROUP BY FUND_CD
 
-	WHEN 	((PD.PSCD_ID = 'A001'
-                                AND (JA.DOC_CD = 'C1' 
-                           OR  (JA.DOC_TYP = 'JV' AND JA.RFED_DOC_CD = 'PRCI' AND JA.DRCR_IND = 'D') 
-                           OR  (JA.DOC_TYP = 'ABS' AND JA.DOC_CD like ('EWX%') AND JA.DRCR_IND = 'D')  
-                           OR (JA.DOC_CD = 'IT' AND JA.DRCR_IND = 'D') 
-                           OR  (JA.DOC_CD = 'RTGPF' AND JA.DRCR_IND = 'D')
-                           OR (JA.DOC_TYP = 'JV'AND FUND_CD IN ('0658','0722') AND JA.DOC_DEPT_CD &lt;&gt;'799' AND JA.DRCR_IND = 'D') 
-                           OR (JA.DOC_TYP = 'JV' AND JA.DOC_ID like 'E%'AND DRCR_IND = 'D'))) OR ( PD.PSCD_ID = 'D035' AND DRCR_IND = 'D'))
-   	then 'CR_YTD'
+)
 
-	when PD.PSCD_ID = 'A001' AND DOC_TYP = 'JV' AND DEPT_CD ='799'  and RSRC_CD IS NOT NULL then 'TRIN_YTD'
-	when PD.PSCD_ID = 'A001'  AND DOC_TYP = 'JV' AND DEPT_CD ='799'    AND OBJ_CD IS NOT NULL  AND SOBJ_CD IS NOT NULL  then 'TROUT_YTD'
+--SELECT * FROM MTD_GLevels_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM YTD_GLevels_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM JA_Totals_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM JA_Totals_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM EndBalanceYTD_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM BegBalanceYTD_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM BegBalanceMTDJuly_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM BegBalanceMTD_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM EndBalanceMTD_GA_CashRevExpTransByFundName_CTE
+--SELECT * FROM AllFunds_GA_CashRevExpTransByFundName_CTE
+--Select * from Period_GA_CashRevExpTransByFundName_CTE as p
 
+/************* Putting it all together *************/
 
-	WHEN PD.PSCD_CLOS_CL_CD ='5' AND 
-	(
-	DOC_CD IN ('AD','EFT','IT','MDCW','MD', 'RTGPF')    
-	OR (DOC_CD= 'JVACM' AND OBJ_CD IS NOT NULL AND isnull(RFED_DOC_CD,'') = 'PRCI') 
-	OR  (DOC_TYP='ABS'     AND OBJ_CD IS NOT NULL) 
-	OR (DOC_CD ='CR' AND OBJ_CD IS NOT NULL) )  THEN 'GROSS_WI_YTD'
+SELECT DISTINCT 
+      AF.FUND_CD
+	 ,AF.FCAT_CD 
+     ,AF.FUND_NM
+	 ,AF.FCAT_NM
+	 ,ISNULL(BEGBALANCEMTD,0) AS BEGBALANCEMTD
+     ,ISNULL(ENDBALANCEMTD,0) AS ENDBALANCEMTD
+     ,ISNULL(BEGBALANCEYTD,0) AS BEGBALANCEYTD
+     ,ISNULL(ENDBALANCEYTD,0) AS ENDBALANCEYTD
+     ,ISNULL(BEGBALANCEMTDJuly,0) AS BEGBALANCEMTDJuly
+     --,ISNULL(SumAllFundsYTD,0) as SumAllFundsYTD
+     --,ISNULL(SumAllFundsMTD,0) as SumAllFundsMTD
+     ,ISNULL(CashReceiptsYTD,0) AS CashReceiptsYTD
+     ,ISNULL(TransfersInYTD,0) AS TransfersInYTD
+     ,ISNULL(TransfersOutYTD,0) AS TransfersOutYTD
+     ,ISNULL(GrossWarrantYTD,0) AS GrossWarrantYTD
+     ,ISNULL(CancelVouchersPayableYTD,0) AS CancelVouchersPayableYTD
+     ,ISNULL(IWPayableYTD,0) AS IWPayableYTD
+     ,ISNULL(LiabYTD,0) AS LiabYTD
+     ,ISNULL(ReceiptsYTD,0) AS ReceiptsYTD
+     ,ISNULL(ExpendituresYTD,0) AS ExpendituresYTD
+     ,ISNULL(VouchersPayable,0) AS VouchersPayableYTD
+     ,ISNULL(DueFrom,0) AS DueFromYTD
+     ,ISNULL(DueTo,0) AS DueToYTD
 
-	WHEN  PD.PSCD_CLOS_CL_CD ='5' and  DOC_CD IN ('DCAN','DC') THEN 'CANCELLED_YTD'
+	 ,ISNULL(CashReceiptsMTD,0) AS CashReceiptsMTD
+	 ,ISNULL(TransfersInMTD,0) AS TransfersInMTD
+	 ,ISNULL(TransfersOutMTD,0) AS TransfersOutMTD
+	 ,ISNULL(GrossWarrantMTD,0) AS GrossWarrantMTD
+	 ,ISNULL(CancelVouchersPayableMTD,0) AS CancelVouchersPayableMTD
+	 ,ISNULL(IWPayableMTD,0) AS IWPayableMTD
+	 ,ISNULL(LiabMTD,0) AS LiabMTD
+	 ,ISNULL(ReceiptsMTD,0) AS ReceiptsMTD
+	 ,ISNULL(ExpendituresMTD,0) AS ExpendituresMTD
+	 ,ISNULL(VouchersPayable,0) AS VouchersPayableMTD
+	 ,ISNULL(DueFrom,0) AS DueFromMTD
+	 ,ISNULL(DueTo,0) AS DueToMTD
 
-	WHEN ISNULL( JA.BSA_CD,0)= ('2034') AND PD.PSCD_CLOS_CL_CD ='2'  THEN 'IW_PAY_YTD'
+	 ----,ISNULL(BEGBALANCEMTD,0) AS [BEGBALANCEMTD]   
+	 --,ISNULL(CashReceiptsMTD,0) AS [CashReceiptsMTD]
+	 --,ISNULL(TransfersInMTD,0) AS [TransfersInMTD]  
+	 --,abs( ISNULL(TransfersOutMTD,0) ) AS [-TransfersOutMTD]
+	 --,abs(ISNULL(GrossWarrantMTD,0)) AS [GrossWarrantMTD] 
+	 --,abs(ISNULL(CancelVouchersPayableMTD,0)) AS [CancelVouchersPayableMTD]
+	 --,abs(ISNULL(LiabMTD,0)) AS [LiabMTD]
+	 --,abs(ISNULL(ReceiptsMTD,0)) AS [ReceiptsMTD] 
+	 --,abs(ISNULL(ExpendituresMTD,0)) AS [ExpendituresMTD]
 
-	WHEN PD.PSCD_CLOS_CL_CD ='2' and JA.BSA_CD IN('2031', '2035','2036','2040', '2045','2300') THEN 'OTHER_LIAB_YTD'
-	-- PRIOR YEAR RECEIPTS MTD 
+	 , ISNULL(BEGBALANCEMTD,0) +  ISNULL(CashReceiptsMTD,0) +  ISNULL(TransfersInMTD,0) - abs( ISNULL(TransfersOutMTD,0) )
+	 - abs(ISNULL(GrossWarrantMTD,0)) +  abs(ISNULL(CancelVouchersPayableMTD,0))   +  abs(ISNULL(LiabMTD,0)) +  abs(ISNULL(ReceiptsMTD,0)) 
+	 + abs(ISNULL(ExpendituresMTD,0)) as EndingBalanceMTD
 
-	WHEN PD.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') ='RE' THEN 'PY_REC_YTD'
-	-- PRIOR YEAR EXPENDITURES MTD 
-
-	WHEN PD.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') = 'EX' AND DOC_TYP ='CR' THEN 'PY_EXP_YTD'
-	END AS GROUP_LEVEL
-	,CONCAT(JA.FUND_CD,FCAT_CD,PER_DC, FY_DC) AS KEY2  
-from JRNL_ACTG AS JA
-  JOIN #P P ON CONCAT(JA.FY_DC,'-', JA.PER_DC) = P.ACC_PER
-LEFT JOIN R_PSCD PD on JA.PSTNG_CD_ID=PD.PSCD_ID
-where 
- JA.FUND_CD not in ('9999','0002','2222') 
-    AND (JA.FUND_CD =@Fund or 'ALL' =@Fund)
-
-)AS M WHERE GROUP_LEVEL IS NOT NULL
-GROUP BY FUND_CD 
-, GROUP_LEVEL
-) AS M1
-GROUP BY FUND_CD 
-) AS M2
-ON  BAL.FUND_CD = M2.FUND_CD 
-
-/********* MTD *****************************************************************/
-LEFT JOIN
-  /***************************************N2 **********/
-(
-SELECT FUND_CD 
-, SUM(CashReceiptsMTD) as CashReceiptsMTD
-,SUM(TransfersInMTD) as TransfersInMTD
-,SUM(TransfersOutMTD) as TransfersOutMTD
-,SUM(GrossWarrantMTD) as GrossWarrantMTD
-,SUM(CancelVouchersPayableMTD) as CancelVouchersPayableMTD
-,SUM(IWPayableMTD) as IWPayableMTD
-,SUM(LiabMTD) as LiabMTD
-,SUM(ReceiptsMTD) as ReceiptsMTD
-,SUM(ExpendituresMTD) as ExpendituresMTD
-
-FROM
-
-(SELECT DISTINCT FUND_CD --, FY_DC 
-,CASE WHEN GROUP_LEVEL= 'CR_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS CashReceiptsMTD
-,CASE WHEN GROUP_LEVEL= 'TRIN_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS TransfersInMTD
-,CASE WHEN GROUP_LEVEL= 'TROUT_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS TransfersOutMTD
-,CASE WHEN GROUP_LEVEL= 'GROSS_WI_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS GrossWarrantMTD
-,CASE WHEN GROUP_LEVEL= 'CANCELLED_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS CancelVouchersPayableMTD
-,CASE WHEN GROUP_LEVEL= 'IW_PAY_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS IWPayableMTD
-,CASE WHEN GROUP_LEVEL= 'OTHER_LIAB_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS LiabMTD
-,CASE WHEN GROUP_LEVEL= 'PY_REC_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS ReceiptsMTD
-,CASE WHEN GROUP_LEVEL= 'PY_EXP_MTD' THEN SUM(PSTNG_AM) ELSE 0 END AS ExpendituresMTD
-
-
-FROM
-(   ----- N **********************
-SELECT JA.FUND_CD ,FY_DC, PER_DC ,JA.PSTNG_AM , doc_id, doc_cd, DOC_DEPT_CD, RSRC_CD, RSCAT_CD, PD.PSCD_CLOS_CL_CD,drcr_ind, BSA_CD,
-	RFED_DOC_CD, JA.PSTNG_CD_ID, PSTD_DT, OBJ_CD, RFED_DOC_ID,
-	CASE 
-            WHEN 
-			((PD.PSCD_ID = 'A001'
-            AND (JA.DOC_CD = 'C1' 
-            OR  (JA.DOC_TYP = 'JV' AND JA.RFED_DOC_CD = 'PRCI' AND JA.DRCR_IND = 'D') 
-            OR  (JA.DOC_TYP = 'ABS' AND JA.DOC_CD like ('EWX%') AND JA.DRCR_IND = 'D')  
-            OR (JA.DOC_CD = 'IT' AND JA.DRCR_IND = 'D') 
-            OR  (JA.DOC_CD = 'RTGPF' AND JA.DRCR_IND = 'D')
-            OR (JA.DOC_TYP = 'JV'AND FUND_CD IN ('0658','0722') AND JA.DOC_DEPT_CD &lt;&gt;'799' AND JA.DRCR_IND = 'D') 
-            OR (JA.DOC_TYP = 'JV' AND JA.DOC_ID like 'E%'AND DRCR_IND = 'D'))) OR ( PD.PSCD_ID = 'D035' AND DRCR_IND = 'D'))
-   		then 'CR_MTD'
-
-	when PD.PSCD_ID = 'A001' AND DOC_TYP = 'JV' AND DEPT_CD ='799'  and RSRC_CD IS NOT NULL then 'TRIN_MTD'
-	when PD.PSCD_ID = 'A001'  AND DOC_TYP = 'JV' AND DEPT_CD ='799'   AND OBJ_CD IS NOT NULL  AND SOBJ_CD IS NOT NULL  then 'TROUT_MTD'
-
-	WHEN PD.PSCD_CLOS_CL_CD ='5' AND 
-	(
-	DOC_CD IN ('AD','EFT','IT','MDCW','MD', 'RTGPF')    
-	OR (DOC_CD= 'JVACM' AND OBJ_CD IS NOT NULL AND isnull(RFED_DOC_CD,'') = 'PRCI') 
-	OR  (DOC_TYP='ABS'     AND OBJ_CD IS NOT NULL) 
-	OR (DOC_CD ='CR' AND OBJ_CD IS NOT NULL) )  THEN 'GROSS_WI_MTD'
-
-	WHEN  PD.PSCD_CLOS_CL_CD ='5' and  DOC_CD IN ('DCAN','DC') THEN 'CANCELLED_MTD'
-
-	WHEN ISNULL( JA.BSA_CD,0) in ('2034') AND PD.PSCD_CLOS_CL_CD ='2' THEN 'IW_PAY_MTD'
-
-	WHEN PD.PSCD_CLOS_CL_CD ='2' and JA.BSA_CD IN('2031', '2035','2036','2040', '2045','2300') THEN 'OTHER_LIAB_MTD'
-	-- PRIOR YEAR RECEIPTS MTD 
-
-	WHEN PD.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') ='RE' THEN 'PY_REC_MTD'
-	-- PRIOR YEAR EXPENDITURES MTD 
-
-	WHEN PD.PSCD_CLOS_CL_CD ='5' and ISNULL(JA.RSCAT_CD,'') = 'EX' AND DOC_TYP ='CR' THEN 'PY_EXP_MTD'
-	ELSE 'OTHER'
-	END AS GROUP_LEVEL,
-
-	CONCAT(JA.FUND_CD,FCAT_CD,PER_DC, FY_DC) AS KEY2  
-
-FROM JRNL_ACTG AS JA 
-	LEFT JOIN R_PSCD PD on JA.PSTNG_CD_ID=PD.PSCD_ID
-where 
-	 JA.FUND_CD not in ('9999','0002','2222') 
-	and (
-	     (JA.FY_DC=@FiscalYear AND ja.PER_DC = @FiscalPeriod) OR
-         (JA.FY_DC= @FiscalYear -1  AND (JA.PER_DC = (CASE WHEN @FiscalPeriod='1' THEN '13' WHEN @FiscalPeriod='2' then '14' WHEN @FiscalPeriod= '3' THEN '15' end)))
-		 )
-	and (JA.FUND_CD =@Fund or 'ALL' =@Fund)
- )
- AS N WHERE GROUP_LEVEL IS NOT NULL
- GROUP BY FUND_CD, FY_DC , GROUP_LEVEL
- ) AS N1
-GROUP BY FUND_CD--,  FY_DC
-) AS N2
-ON BAL.FUND_CD = N2.FUND_CD 
-	LEFT JOIN (select FY, FUND_CD, CURR_BAL AS 'VouchersPayable'  from r_bbal_FY_details where FY=@FiscalYear AND BSA_CD='2030' and (FUND_CD =@Fund or 'ALL' =@Fund)) V1
-ON BAL.FUND_CD = V1.FUND_CD
-LEFT JOIN (select FY, FUND_CD, CURR_BAL AS 'DueFrom'  from r_bbal_FY_details where FY=@FiscalYear AND BSA_CD='1410' and (FUND_CD =@Fund or 'ALL' =@Fund)) V2
-ON BAL.FUND_CD = V2.FUND_CD
-LEFT JOIN (select FY, FUND_CD, CURR_BAL AS 'DueTo'  from r_bbal_FY_details where FY=@FiscalYear AND BSA_CD IN ('2150','2155') and (FUND_CD =@Fund or 'ALL' =@Fund)) V3
-ON BAL.FUND_CD = V3 .FUND_CD
-WHERE BAL.FUND_CD  not in ('9999','0002','2222') 
-ORDER BY  FCAT_CD, FUND_CD</CommandText>
+	 , ISNULL(BEGBALANCEMTDJuly,0) +  ISNULL(CashReceiptsYTD,0) +  ISNULL(TransfersInYTD,0) - abs( ISNULL(TransfersOutYTD,0) )
+	 - abs(ISNULL(GrossWarrantYTD,0)) +  abs(ISNULL(CancelVouchersPayableYTD,0))  +  abs(ISNULL(LiabYTD,0)) +  abs(ISNULL(ReceiptsYTD,0)) 
+	 + abs(ISNULL(ExpendituresYTD,0)) as EndingBalanceYTD
+ 
+FROM AllFunds_GA_CashRevExpTransByFundName_CTE AS AF
+LEFT JOIN EndBalanceMTD_GA_CashRevExpTransByFundName_CTE AS EndBalMTD ON AF.FUND_CD = EndBalMTD.FUND_CD
+LEFT JOIN BegBalanceMTD_GA_CashRevExpTransByFundName_CTE AS BegBalMTD ON AF.FUND_CD = BegBalMTD.FUND_CD
+LEFT JOIN BegBalanceMTDJuly_GA_CashRevExpTransByFundName_CTE AS EndBalMTDJuly ON AF.FUND_CD = EndBalMTDJuly.FUND_CD
+LEFT JOIN MTD_GLevels_GA_CashRevExpTransByFundName_CTE AS GLevelsMTD ON AF.FUND_CD = GLevelsMTD.FUND_CD
+LEFT JOIN EndBalanceYTD_GA_CashRevExpTransByFundName_CTE AS EndBalYTD ON AF.FUND_CD = EndBalYTD.FUND_CD
+LEFT JOIN BegBalanceYTD_GA_CashRevExpTransByFundName_CTE AS BegBalYTD ON AF.FUND_CD = BegBalYTD.FUND_CD
+LEFT JOIN YTD_GLevels_GA_CashRevExpTransByFundName_CTE AS GLevelsYTD ON AF.FUND_CD = GLevelsYTD.FUND_CD
+LEFT JOIN (SELECT FY
+                 ,FUND_CD
+				 ,CURR_BAL AS 'VouchersPayable'  
+		   FROM r_bbal_FY_details
+		   WHERE FY = @FiscalYear 
+		     AND BSA_CD = '2030' 
+			 AND (FUND_CD = @Fund OR 'ALL' = @Fund)
+		  ) AS V1 ON AF.FUND_CD = V1.FUND_CD
+LEFT JOIN (SELECT FY
+                 ,FUND_CD
+				 ,CURR_BAL AS 'DueFrom'  
+		   FROM r_bbal_FY_details 
+		   WHERE FY=@FiscalYear 
+		     AND BSA_CD='1410' 
+			 AND (FUND_CD = @Fund OR 'ALL' = @Fund)
+		  ) V2 ON AF.FUND_CD = V2.FUND_CD
+LEFT JOIN (SELECT FY
+                 ,FUND_CD
+				 ,CURR_BAL AS 'DueTo'  
+		   FROM r_bbal_FY_details 
+		   WHERE FY = @FiscalYear AND BSA_CD IN ('2150','2155') 
+		    AND (FUND_CD =@Fund OR 'ALL' =@Fund)
+		  ) V3 ON AF.FUND_CD = V3 .FUND_CD
+ORDER BY  AF.FCAT_CD, AF.FUND_CD</CommandText>
       </Query>
       <Fields>
         <Field Name="FundCatFund">
@@ -620,14 +677,6 @@ ORDER BY  FCAT_CD, FUND_CD</CommandText>
         <Field Name="ENDBALANCEYTD">
           <rd:TypeName>System.Decimal</rd:TypeName>
           <DataField>ENDBALANCEYTD</DataField>
-        </Field>
-        <Field Name="SumAllFundsYTD">
-          <rd:TypeName>System.Decimal</rd:TypeName>
-          <DataField>SumAllFundsYTD</DataField>
-        </Field>
-        <Field Name="SumAllFundsMTD">
-          <rd:TypeName>System.Decimal</rd:TypeName>
-          <DataField>SumAllFundsMTD</DataField>
         </Field>
         <Field Name="CashReceiptsYTD">
           <rd:TypeName>System.Decimal</rd:TypeName>
