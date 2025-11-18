@@ -11,7 +11,7 @@
       <am:Name>PBIRB</am:Name>
       <am:Version>15.7.1813.16</am:Version>
     </am:UpdatedBy>
-    <am:LastModifiedTimestamp>2025-11-17T16:32:36.3328858Z</am:LastModifiedTimestamp>
+    <am:LastModifiedTimestamp>2025-11-18T15:13:46.9928932Z</am:LastModifiedTimestamp>
   </am:AuthoringMetadata>
   <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
   <AutoRefresh>0</AutoRefresh>
@@ -20,7 +20,7 @@
       <rd:SecurityType>DataBase</rd:SecurityType>
       <ConnectionProperties>
         <DataProvider>SQL</DataProvider>
-        <ConnectString>Data Source=162.70.100.98;Initial Catalog=ILOM1FN1</ConnectString>
+        <ConnectString>Data Source=10.106.121.11;Initial Catalog=ILOM1FN1</ConnectString>
         <Prompt>Specify a user name and password for data source Database:</Prompt>
       </ConnectionProperties>
       <rd:DataSourceID>1037e6d9-8dd6-45e8-b62e-42c1830a31c3</rd:DataSourceID>
